@@ -1,0 +1,534 @@
+---
+title: "LittleCoders"
+author: "D.M.K.M.Dissanayake"
+date: "2024-08-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Dataset
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(scales)
+
+Dataset <- read_excel("C:/Users/Malsha/Desktop/Dataset.xlsx")
+Dataset <- Dataset[-c(1, 10, 14), ]
+print(Dataset)
+```
+
+
+## Structure of the dataset
+
+```{r,warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+Dataset$`Age Group` <- gsub("\\s*\\+\\s*", "-Inf", Dataset$`Age Group`)
+Dataset$`Age Group` <- gsub("\\s*\\-\\s*", "-", Dataset$`Age Group`)
+Dataset$`Age Group` <- ifelse(grepl("-", Dataset$`Age Group`), Dataset$`Age Group`, paste0(Dataset$`Age Group`, "-Inf"))
+
+Dataset$Features <- gsub("\\s*,\\s*", ", ", Dataset$Features)
+
+Dataset$Duration <- as.numeric(gsub(" hours", "", Dataset$Duration))
+
+Dataset$`Registration fee` <- as.numeric(Dataset$`Registration fee`)
+Dataset$`Course fee` <- as.numeric(Dataset$`Course fee`)
+
+Dataset$`Delivery method` <- as.factor(Dataset$`Delivery method`)
+
+str(Dataset)
+```
+
+
+
+
+## 1. Demographic Insight
+To Analyze the target demographics for each course to understand the primary audience.
+
+
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+
+# Split Age Group into min and max age
+Dataset <- Dataset %>%
+  separate(`Age Group`, into = c("Min_Age", "Max_Age"), sep = "-", convert = TRUE)
+```
+
+#### Summary statistics for minimum age
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE }
+# Summary statistics for min and max age
+summary(Dataset$Min_Age)
+```
+
+
+
+#### Summary statistics for maximum age
+
+```{r,warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+summary(Dataset$Max_Age)
+
+```
+
+
+
+#### Age Distribution of Coding Courses
+```{r,warning=FALSE, message=FALSE, error=FALSE, echo=FALSE }
+# Convert Min_Age and Max_Age to numeric if not already
+Dataset$Min_Age <- as.numeric(Dataset$Min_Age)
+Dataset$Max_Age <- as.numeric(Dataset$Max_Age)
+
+# Add a numeric label for each course
+Dataset <- Dataset %>%
+  mutate(Course_Number = row_number())
+
+# Determine the most common age range
+most_common_min <- as.numeric(names(sort(table(Dataset$Min_Age), decreasing = TRUE)[1]))
+most_common_max <- as.numeric(names(sort(table(Dataset$Max_Age), decreasing = TRUE)[1]))
+
+# Create the plot
+ggplot(Dataset, aes(x = Course_Number, ymin = Min_Age, ymax = Max_Age)) +
+  geom_rect(aes(xmin = -Inf, xmax = Inf, ymin = most_common_min, ymax = most_common_max), 
+            fill = "lightblue", alpha = 0.2) + # Highlight the most common age range
+  geom_linerange(color = "blue", size = 2) + # Create a line range from Min_Age to Max_Age for each course
+  geom_point(aes(y = Min_Age), color = "green", size = 3) + # Show the Min_Age as a point
+  geom_point(aes(y = Max_Age), color = "red", size = 3) + # Show the Max_Age as a point
+  geom_hline(yintercept = most_common_min, linetype = "dashed", color = "black", size = 1) + # Draw horizontal line at most common Min_Age
+  geom_hline(yintercept = most_common_max, linetype = "dashed", color = "black", size = 1) + 
+  # Replace the existing geom_text lines with these:
+  geom_text(aes(x = max(Course_Number) + 0.5, y = most_common_min, label = paste("Min:", most_common_min)), 
+            color = "purple", vjust = 1.5) +  # Label for minimum age
+  geom_text(aes(x = max(Course_Number) + 0.5, y = most_common_max, label = paste("Max:", most_common_max)), 
+            color = "purple", vjust = -0.5) + # Label for maximum age
+  
+  labs(x = "Course Number",
+       y = "Age Range",
+       caption = "Green point: Minimum Age, Red point: Maximum Age, Shaded: Most Common Age Range") +
+  scale_x_continuous(breaks = Dataset$Course_Number, labels = Dataset$Course_Number) + # Use course numbers as labels
+  theme_minimal() +
+  coord_flip()
+
+
+```
+
+Here the most courses are designed for children between 10 and 16 years old. This indicates that the primary audience for these coding courses is pre-teens and teenagers. 
+
+
+
+
+
+## 2. Curriculum & Feature Insight
+To understand which coding languages and topics are most commonly taught and identify the unique features of each course.
+
+
+
+####  Top 12 Most Common Features in Coding Courses
+```{r,echo=FALSE}
+# Load necessary library
+library(ggplot2)
+
+# Split Features into individual items and count occurrences
+feature_list <- Dataset %>%
+  separate_rows(Features, sep = ", ") %>%
+  count(Features, sort = TRUE) %>%
+  top_n(12, n)
+
+# Create a bar chart of the top 12 most common features with labels
+ggplot(feature_list, aes(x = reorder(Features, n), y = n)) +
+  geom_bar(stat = "identity", fill = "skyblue") +
+  geom_text(aes(label = n), hjust = -0.3, size = 3.5) +  # Add labels to bars
+  coord_flip() +
+  labs( 
+       x = "Features",
+       y = "Count") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(hjust = 1))
+
+```
+
+
+
+#### The unique features
+```{r,echo=FALSE}
+# Count the frequency of each feature
+feature_count <- Dataset %>%
+  separate_rows(Features, sep = ", ") %>%
+  count(Features, sort = TRUE)
+
+# Identify unique features (appearing only once)
+unique_features <- feature_count %>%
+  filter(n == 1)
+
+# Print unique features
+print(unique_features)
+```
+
+The most commonly taught topics across coding courses in Sri Lanka for 11-16-year-olds are Python, Scratch, and HTML/CSS. These languages and tools appear frequently, indicating a strong focus on foundational programming and web development skills. 
+
+Additionally, there are unique features, such as AI, App Design, and App Development, which are only offered in one course each, highlighting specialized areas not commonly covered in other programs.
+
+
+
+
+##  3. Pricing Insight
+To analyze the cost structure of coding courses, including registration fees, monthly fees, and total costs.
+
+
+
+#### Distribution of Registration Fees
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+# Load necessary libraries
+library(ggplot2)
+library(scales)
+library(knitr)
+
+# Replace 'NA' values with 0
+Dataset$`Registration fee`[is.na(Dataset$`Registration fee`)] <- 0
+Dataset$`Course fee`[is.na(Dataset$`Course fee`)] <- 0
+
+# Convert to numeric
+Dataset$`Registration fee` <- as.numeric(Dataset$`Registration fee`)
+Dataset$`Course fee` <- as.numeric(Dataset$`Course fee`)
+
+
+# Histogram of Registration Fees with formatted axis values
+ggplot(Dataset, aes(x = `Registration fee`)) +
+  geom_histogram(binwidth = 1000, fill = "skyblue", color = "black") +
+  scale_x_continuous(labels = scales::comma) +
+  scale_y_continuous(labels = scales::comma) +
+  labs(x = "Registration Fee (LKR)", y = "Count") +
+  theme_minimal()
+```
+
+
+ 
+
+#### Distribution of Course Fees
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+# Histogram of Course Fees with formatted axis values
+ hist(Dataset$`Course fee`, 
+     main = "Distribution of Course Fees", 
+     xlab = "Course Fee (LKR)", 
+     col = "lightgreen", 
+     breaks = 10)  # Increase the number of breaks to add more bins
+ 
+
+```
+
+
+
+#### Summary Statistics for Registration and Course Fees
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+# Filter out zero values for summary statistics
+non_zero_reg_fees <- Dataset$`Registration fee`[Dataset$`Registration fee` > 0]
+non_zero_course_fees <- Dataset$`Course fee`[Dataset$`Course fee` > 0]
+
+# Calculate summary statistics for Registration Fees
+max_reg_fee <- max(non_zero_reg_fees, na.rm = TRUE)
+min_reg_fee <- min(non_zero_reg_fees, na.rm = TRUE)
+common_reg_fee_range <- paste0(
+  quantile(non_zero_reg_fees, probs = 0.25, na.rm = TRUE), 
+  " - ", 
+  quantile(non_zero_reg_fees, probs = 0.75, na.rm = TRUE)
+)
+
+# Calculate summary statistics for Course Fees
+max_course_fee <- max(non_zero_course_fees, na.rm = TRUE)
+min_course_fee <- min(non_zero_course_fees, na.rm = TRUE)
+common_course_fee_range <- paste0(
+  quantile(non_zero_course_fees, probs = 0.25, na.rm = TRUE), 
+  " - ", 
+  quantile(non_zero_course_fees, probs = 0.75, na.rm = TRUE)
+)
+
+# Create a summary statistics table
+summary_stats <- data.frame(
+  Statistic = c("Max", "Min", "Common Range (25th-75th Percentile)"),
+  Registration_Fees = c(max_reg_fee, min_reg_fee, common_reg_fee_range),
+  Course_Fees = c(max_course_fee, min_course_fee, common_course_fee_range)
+)
+
+# Print summary statistics table
+kable(summary_stats, caption = "Summary Statistics for Registration and Course Fees (excluding zeros)")
+
+```
+
+ 
+Most of the coding courses do not have registration fees. 
+For those that do, the registration fees range from LKR 5,000 to LKR 10,000, with the most common range being between LKR 8,750 and LKR 10,000. 
+
+Course fees vary more widely, from LKR 12,000 to LKR 304,000, with the most common fees falling between LKR 47,000 and LKR 60,000.
+
+
+
+
+## 4.Duration & Intensity Insight
+To Analyze the duration and intensity of courses to understand the commitment required from students.
+
+
+
+#### **Summary statistics for course duration**
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+Dataset$Duration <- as.numeric(Dataset$Duration)
+summary(Dataset$Duration)
+```
+
+
+
+
+#### **Course Duration for Each Course**
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+# Intensity Analysis
+ggplot(Dataset, aes(x = reorder(`Course name`, Duration), y = Duration)) +
+  geom_bar(stat = "identity", fill = "lightcoral") +
+  coord_flip() +
+  labs(x = "Course Name", y = "Duration (hours)") +
+  theme_minimal()
+```
+
+- The course durations range from 20 to 192 hours.
+- Most courses fall between 25 and 50 hours, with an average duration of 53.5 hours.
+- There is one outlier course lasting nearly 200 hours.
+
+
+
+
+#### **Distribution of Course Duration**
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+boxplot(Dataset$Duration, 
+        main = "Distribution of Course Durations", 
+        ylab = "Duration (hours)", 
+        col = "lightblue")
+
+```
+
+- The majority of courses last between 25 and 50 hours.
+- A few courses are shorter, while one is significantly longer.
+
+ 
+
+
+#### **Correlation between Duration and Course Fee**
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+plot(Dataset$Duration, Dataset$`Course fee`, 
+     main = "Course Duration vs Course Fee",
+     xlab = "Duration (hours)", 
+     ylab = "Course Fee (LKR)", 
+     col = "darkgreen", pch = 16)
+abline(lm(Dataset$`Course fee` ~ Dataset$Duration), col="red")
+```
+
+- There is a positive correlation between course duration and course fee, indicating that longer courses tend to be more expensive.
+
+
+
+#### **Course Duration with Delivery methods**
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE }
+ggplot(Dataset, aes(x = `Delivery method`, y = Duration)) +
+  geom_boxplot(aes(fill = `Delivery method`)) +
+  labs(title = "Course Duration by Delivery Method", y = "Duration (hours)") +
+  theme_minimal()
+
+
+```
+
+- Hybrid Courses: Generally longer, with most lasting between 50 and 100 hours. There is one course extending up to 200 hours.
+
+- Online Courses: Typically shorter, with most lasting around 5 to 10 hours
+
+
+
+
+
+## 5. Delivery Methods 
+To compare the coding products with similar offerings in the market and identify unique selling points or gaps in the market
+
+
+
+
+#### Distribution of Delivery Methods
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+
+# Count courses by delivery method
+delivery_count <- Dataset %>%
+  count(`Delivery method`)
+
+# Create a pie chart
+ggplot(delivery_count, aes(x = "", y = n, fill = `Delivery method`)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y", start = 0) +
+  labs(x = "", y = "") +
+  theme_void() +
+  theme(legend.title = element_blank())
+
+```
+
+The pie chart shows that most coding courses are offered through hybrid methods, with only a few available online.
+
+
+
+
+#### Average Fee by Delivery Method
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+# Calculate the average course fee by delivery method
+avg_fee_by_delivery <- Dataset %>%
+  group_by(`Delivery method`) %>%
+  summarise(average_fee = mean(`Course fee`, na.rm = TRUE))
+
+# Merge with the count data
+delivery_summary <- left_join(delivery_count, avg_fee_by_delivery, by = "Delivery method")
+
+# Create a stacked bar chart
+ggplot(delivery_summary, aes(x = `Delivery method`, y = n, fill = `Delivery method`)) +
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = paste0("Avg Fee: ", round(average_fee, 0))), vjust = -0.5) +
+  labs(title = "Number of Courses and Average Fee by Delivery Method", x = "Delivery Method", y = "Number of Courses") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+
+```
+
+The stacked bar chart reveals that:
+- Hybrid Courses: There are over 10 courses with an average fee of 87,714.
+- Online Courses: There are around 5 courses with a significantly lower average fee of 18,000.
+This suggests that hybrid courses are more prevalent and come at a higher cost compared to online courses.
+
+
+
+
+
+## 6.Market Positioning Insight
+To compare the coding products with similar offerings in the market and identify unique selling points or gaps in the market
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+
+# Summarize average course fee and duration
+market_positioning <- Dataset %>%
+  summarise(
+    avg_duration = mean(Duration, na.rm = TRUE),
+    avg_fee = mean(`Course fee`, na.rm = TRUE),
+    count_courses = n()
+  )
+
+# Print the summary
+print(market_positioning)
+
+
+
+```
+
+
+
+#### The most common features
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+# Count the frequency of each feature
+feature_count <- Dataset %>%
+  separate_rows(Features, sep = ", ") %>%
+  count(Features, sort = TRUE)
+
+print(feature_count)
+```
+
+
+
+#### Unique Features
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+# Identify unique features (appearing only once)
+unique_features <- feature_count %>%
+  filter(n == 1)
+
+print(unique_features)
+
+```
+
+On average, the coding courses have a duration of 53.5 hours and an average fee of 75,412 LKR.
+The most commonly taught features include Python, Scratch, and HTML/CSS, with Python and Scratch being the most prevalent in 9 courses each.
+Unique features identified across the courses include AI, App Design, Astronomy, and several others, indicating some courses offer specialized content not widely available.
+
+
+
+
+
+## 7. Comparing with Hypothetical Competitor
+
+Let's assume for "Compatitor A" course , the Average course fee is Rs.50,000 and the Average coursze duration is 40 hours.
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, echo=FALSE}
+# Hypothetical competitor data (replace with actual data)
+competitor_data <- tibble(
+  Competitor = c("Competitor A"),
+  avg_fee = c(50000),
+  avg_duration = c(40)
+)
+
+# Combine your data with competitor data
+combined_data <- bind_rows(
+  tibble(Competitor = "Your Courses", avg_fee = market_positioning$avg_fee, avg_duration = market_positioning$avg_duration),
+  competitor_data
+)
+
+# Plotting comparison
+ggplot(combined_data, aes(x = Competitor, y = avg_fee, fill = Competitor)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Comparison of Average Course Fees", x = "Competitor", y = "Average Course Fee (LKR)")
+
+ggplot(combined_data, aes(x = Competitor, y = avg_duration, fill = Competitor)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Comparison of Average Course Durations", x = "Competitor", y = "Average Duration (hours)")
+
+ 
+```
+
+The plots I created show how these courses' average fees and durations compare to those of Competitor A. 
+This visual comparison helps highlight differences in pricing and course length between these offerings and those of a competitor.
+
+
+
+## 8. Experiment Proposal: Comparing the Effectiveness of Our Coding Product vs. Competitor's Product 
+
+The goal of this experiment is to determine whether our coding product or the competitor's product is more effective in teaching coding skills to students.
+
+### Experiment Design
+
+#### 1. Participant Selection
+
+Select 20 students from the same classroom. All students should be of the same age and have a similar level of prior coding knowledge to ensure a fair comparison.
+
+#### 2. Initial Assessment
+
+Before the learning phase, administer a coding test to all 20 students to assess their current coding skills. Record the test results for each student.
+
+#### 3. Group Division
+
+- Divide the students into two groups of 10 students each.
+- **Group A** will use our coding product for learning.
+- **Group B** will use the competitor's coding product.
+
+#### 4. Learning Phase
+
+Provide both groups with sufficient time to learn coding using their respective products. Ensure that the learning conditions are the same for both groups (e.g., time spent learning, access to resources, etc.).
+
+#### 5. Post-Learning Assessment
+
+After the learning phase, administer the same coding test to both groups. Record the test results for each student again.
+
+#### 6. Data Analysis
+
+Compare the test results before and after the learning phase for both groups. Analyze the improvement in coding skills for each group to determine which product led to greater progress.
+
+#### 7. Conclusion
+
+The results will show whether our coding product or the competitor's product is more effective in improving coding skills among students.
+
+### Key Points for Explanation
+
+- The experiment is designed to be fair, with both groups starting at the same level.
+- The use of pre- and post-tests allows us to measure the exact improvement in skills.
+- By comparing the results, we can make an informed decision about which product is better.
+
+
